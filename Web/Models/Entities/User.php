@@ -42,6 +42,10 @@ class User extends RowModel
     public const NSFW_TOLERANT      = 1;
     public const NSFW_FULL_TOLERANT = 2;
 
+    /* aggressive caching */
+    private $_avatarAlbum = null;
+    private $_avatarPhoto = false; // false - not resolved, null - no avatar
+
     protected function _abstractRelationGenerator(string $filename, int $page = 1, int $limit = 6): \Traversable
     {
         $id     = $this->getId();
@@ -156,18 +160,27 @@ class User extends RowModel
         }
 
         $pid = $avPhoto->getPrettyId();
-        $aid = (new Albums())->getUserAvatarAlbum($this)->getId();
+        $aid = $this->getAvatarAlbum()->getId();
 
         return "/photo$pid?from=album$aid";
     }
 
+    public function getAvatarAlbum(): ?Album
+    {
+        return $this->_avatarAlbum ??= (new Albums())->getUserAvatarAlbum($this);
+    }
+
     public function getAvatarPhoto(): ?Photo
     {
-        $avAlbum  = (new Albums())->getUserAvatarAlbum($this);
+        if ($this->_avatarPhoto !== false) {
+            return $this->_avatarPhoto;
+        }
+
+        $avAlbum  = $this->getAvatarAlbum();
         $avCount  = $avAlbum->getPhotosCount();
         $avPhotos = $avAlbum->getPhotos($avCount, 1);
 
-        return iterator_to_array($avPhotos)[0] ?? null;
+        return $this->_avatarPhoto = iterator_to_array($avPhotos)[0] ?? null;
     }
 
     public function getFirstName(bool $pristine = false): string
@@ -223,9 +236,12 @@ class User extends RowModel
             } else {
                 $name = $this->getFirstName() . " " . $this->getLastName();
             }
-        } else {
+        } elseif ($startWithLastName == false) {
             $name = $this->getFirstName();
+        } else {
+            $name = $this->getLastName();
         }
+
         if (!preg_match("/^[А-Яа-яЁё\s-]+$/u", $name)) {
             return $name;
         } # name is probably not russian
@@ -1005,12 +1021,15 @@ class User extends RowModel
                 case 'openvk_flux_android':
                 case 'openvk_refresh_android':
                 case 'openvk_legacy_android':
+                case 'Kate Mobile':
+                case 'VK for Android':
                     return 'android';
                     break;
 
                 case 'openvk_native_ios':
                 case 'openvk_ios':
                 case 'openvk_legacy_ios':
+                case 'VK for iOS':
                     return 'iphone';
                     break;
 
@@ -1540,13 +1559,13 @@ class User extends RowModel
         $res = (object) [];
 
         $res->id = $this->getId();
-        $res->first_name = $this->getFirstName();
-        $res->last_name = $this->getLastName();
+        $res->first_name  = $this->getFirstName();
+        $res->last_name   = $this->getLastName();
         $res->deactivated = $this->isDeactivated();
         $res->is_closed   = $this->isClosed();
 
         if (!is_null($relation_user)) {
-            $res->can_access_closed  = (bool) $this->canBeViewedBy($relation_user);
+            $res->can_access_closed = (int) $this->canBeViewedBy($relation_user);
         }
 
         if (!is_array($fields)) {
@@ -1585,6 +1604,9 @@ class User extends RowModel
                     break;
                 case 'reg_date':
                     $res->reg_date = $this->getRegistrationTime()->timestamp();
+                    break;
+                case 'nickname':
+                    $res->nickname = $this->getPseudo();
                     break;
                 case 'nickname':
                     $res->nickname = $this->getPseudo();
