@@ -1,5 +1,4 @@
 {extends "../@layout.latte"}
-
 {block title}
     {tr("search_for_$section")}
     {ifset $_REQUEST['q']}
@@ -9,6 +8,10 @@
 
 {block header}
     {tr("search_for_$section")}
+{/block}
+
+{block bodyScripts}
+{script "js/al_search.js"}
 {/block}
 
 {block wrap}
@@ -360,6 +363,12 @@
                 {if $section == "audios" || $section == "audios_playlists"}
                     <option value="length" n:attr="selected  => $order == 'length'">{_s_order_by_length}</option>
                     <option value="listens" n:attr="selected => $order == 'listens'">{_s_order_by_listens}</option>
+                {/if}
+                {if $section == "groups"}
+                    <option value="members" n:attr="selected  => $order == 'members'">{_s_order_by_members}</option>
+                    <option value="popular" n:attr="selected => $order == 'popular'">{_s_order_by_popular}</option>
+                    <option value="recommended" n:attr="selected => $order == 'popular'">{_s_order_by_recommended}</option>
+
                 {/if}
             </select>
 
